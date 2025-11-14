@@ -19,12 +19,11 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-distutils python3-dev build-essential
+        sudo apt-get install -y python3-dev build-essential
+        python -m ensurepip --upgrade
         python -m pip install --upgrade pip setuptools wheel
-        # Install Buildozer and Python-for-Android
-        python -m pip install buildozer python-for-android
-        # Install Nuitka
-        python -m pip install nuitka
+        # Install Buildozer, P4A, Nuitka
+        python -m pip install buildozer python-for-android nuitka
 
     - name: Build APK
       run: |
