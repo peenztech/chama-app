@@ -18,9 +18,13 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt update
-        sudo apt install -y build-essential python3-pip git unzip openjdk-17-jdk
-        pip install --upgrade buildozer cython
+        sudo apt-get update
+        sudo apt-get install -y python3-distutils python3-dev build-essential
+        python -m pip install --upgrade pip setuptools wheel
+        # Install Buildozer and Python-for-Android
+        python -m pip install buildozer python-for-android
+        # Install Nuitka
+        python -m pip install nuitka
 
     - name: Build APK
       run: |
