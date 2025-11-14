@@ -1,0 +1,13 @@
+*.pyc
+__pycache__/
+.buildozer/
+*.pyo
+*.pyd
+*.db
+*.log
+*.swp
+*.zip
+*.apk
+*.aab
+myenv/
+

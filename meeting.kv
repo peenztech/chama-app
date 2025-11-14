@@ -1,0 +1,57 @@
+# registerfamily.kv
+<MeetingScreen>:
+    name: "meeting"
+
+    MDBoxLayout:
+        orientation: "vertical"
+
+        CustomTopBar:
+            title: "Register Meetinf"
+        ScrollView:
+            MDBoxLayout
+                orientation: "vertical"
+                spacing: "15dp"
+                padding: "15dp"
+                adaptive_height: True
+                MDLabel:
+                    text: "Enter Residence:"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    font_style: "Title"
+
+                MDTextField:
+                    id: residence
+                    hint_text: "Family Name"
+                    helper_text: "Example: Njoki Family"
+                    helper_text_mode: "on_focus"
+                    icon_right: "account-group"
+                    required: True
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                MDLabel:
+                    text: "Catering Amount:"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    font_style: "Title"
+
+                MDTextField:
+                    id: cateringamount
+                    hint_text: "Family Name"
+                    helper_text: "Example: Njoki Family"
+                    helper_text_mode: "on_focus"
+                    icon_right: "account-group"
+                    required: True
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                MDButton:
+                    md_bg_color: app.theme_cls.primaryColor
+                    text_color: 1,1,1,1
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                    on_release:
+                        root.register_meeting(residence.text,cateringamount.text)
+                    MDButtonText:
+                        text: "Register Meeting"
+                Widget:
+                    size_hint_y: None
+                    height: dp(50)  # spacing at bott

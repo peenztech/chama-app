@@ -1,0 +1,39 @@
+# topbar.kv
+<CustomTopBar@BoxLayout>:
+    size_hint_y: None
+    height: "56dp"
+    padding: "6dp"
+    spacing: "8dp"
+
+    canvas.before:
+        Color:
+            rgba: 0.2, 0.6, 1, 1   # blue background
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+    MDIconButton:
+        icon: "plus"
+        theme_text_color: "Custom"
+        text_color: 1, 1, 1, 1
+        on_release: app.open_menu(self)
+
+    MDLabel:
+        text: root.title if hasattr(root, 'title') else "FamilyFintech"
+        halign: "left"
+        valign: "middle"
+        size_hint_x: 1
+        text_size: self.size
+        theme_text_color: "Custom"
+        text_color: 1, 1, 1, 1
+        font_size: "18sp"
+
+    Widget:
+        size_hint_x: None
+        width: "8dp"
+
+    MDIconButton:
+        icon: "account-group"
+        theme_text_color: "Custom"
+        text_color: 1, 1, 1, 1
+        on_release: app.back_up()

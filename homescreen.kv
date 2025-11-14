@@ -1,0 +1,17 @@
+# homescreen.kv
+<HomeScreen>:
+    name: "home"
+
+    MDBoxLayout:
+        orientation: "vertical"
+
+        CustomTopBar:
+            title: "FamilyFintech"
+
+        ScrollView:
+            MDBoxLayout:
+                id: family_grid
+                orientation: "vertical"
+                adaptive_height: True
+                spacing: "10dp"
+                padding: "10dp"

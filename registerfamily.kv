@@ -1,0 +1,42 @@
+# registerfamily.kv
+<RegisterFamilyScreen>:
+    name: "register_family"
+
+    MDBoxLayout:
+        orientation: "vertical"
+
+        CustomTopBar:
+            title: "Register Family"
+        FloatLayout:
+            MDBoxLayout
+                orientation: "vertical"
+                size_hint: None, None
+                size: dp(300), dp(200)
+                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                spacing: dp(24)
+                MDLabel:
+                    text: "Enter the family name below:"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    font_style: "Title"
+
+                MDTextField:
+                    id: family_name
+                    hint_text: "Family Name"
+                    helper_text: "Example: Njoki Family"
+                    helper_text_mode: "on_focus"
+                    icon_right: "account-group"
+                    required: True
+                    size_hint_x: 0.9
+                    pos_hint: {"center_x": 0.5}
+                MDButton:
+                    md_bg_color: app.theme_cls.primaryColor
+                    text_color: 1,1,1,1
+                    pos_hint: {"center_x": 0.5}
+                    on_release:
+                        root.register_family(family_name.text)
+                    MDButtonText:
+                        text: "Register Family"
+                Widget:
+                    size_hint_y: None
+                    height: dp(50)  # spacing at bott

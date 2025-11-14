@@ -1,0 +1,109 @@
+# registerfamily.kv
+<MembersFamilyScreen>:
+    name: "members_family"
+
+    MDBoxLayout:
+        orientation: "vertical"
+
+        CustomTopBar:
+            title: "Register Family Member"
+        ScrollView:
+            MDBoxLayout
+                orientation: "vertical"
+                spacing: "15dp"
+                padding: "15dp"
+                adaptive_height: True
+                MDLabel:
+                    text: "Select Family"
+                    halign: "center"
+                    pos_hint: {"center_y": 0.95}
+
+                MDTextField:
+                    id: contribution_field
+                    hint_text: "Select Family"
+                    readonly: True
+                    pos_hint: {"center_x": 0.5}
+                    on_focus:
+                        if self.focus: root.open_contribution_menu()
+                    size_hint_x: 0.95
+                MDLabel:
+                    text: "Enter FirstName:"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    font_style: "Title"
+
+                MDTextField:
+                    id: firstname
+                    hint_text: "Family Name"
+                    helper_text: "Example: Njoki Family"
+                    helper_text_mode: "on_focus"
+                    icon_right: "account-group"
+                    required: True
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                MDLabel:
+                    text: "Enter MiddleName:"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    font_style: "Title"
+
+                MDTextField:
+                    id: middlename
+                    hint_text: "Family Name"
+                    helper_text: "Example: Njoki Family"
+                    helper_text_mode: "on_focus"
+                    icon_right: "account-group"
+                    required: True
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                MDLabel:
+                    text: "Enter LastName:"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    font_style: "Title"
+
+                MDTextField:
+                    id: lastname
+                    hint_text: "Family Name"
+                    helper_text: "Example: Njoki Family"
+                    helper_text_mode: "on_focus"
+                    icon_right: "account-group"
+                    required: True
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                MDLabel:
+                    text: "Enter PhoneNo:"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    font_style: "Title"
+
+                MDTextField:
+                    id: phoneno
+                    hint_text: "Family Name"
+                    helper_text: "Example: Njoki Family"
+                    helper_text_mode: "on_focus"
+                    icon_right: "account-group"
+                    required: True
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                MDButton:
+                    md_bg_color: app.theme_cls.primaryColor
+                    text_color: 1,1,1,1
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                    on_release:
+                        root.family_member(contribution_field.text, firstname.text,middlename.text, lastname.text, phoneno.text)
+                    MDButtonText:
+                        text: "Family Member"
+                MDButton:
+                    md_bg_color: app.theme_cls.primaryColor
+                    text_color: 1,1,1,1
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                    on_release:
+                        root.contact_report()
+                    MDButtonText:
+                        text: "Contact Report"
+                Widget:
+                    size_hint_y: None
+                    height: dp(50)  # spacing at bott

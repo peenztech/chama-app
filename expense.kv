@@ -1,0 +1,89 @@
+<ExpenditureScreen>:
+	name:"expenses"
+	MDBoxLayout:
+        orientation: "vertical"
+        CustomTopBar:
+            title: "Family Expenditure"
+        ScrollView:
+            MDBoxLayout
+                orientation: "vertical"
+                spacing: "15dp"
+                padding: "15dp"
+                adaptive_height: True
+                MDLabel:
+                    text: "Enter Beneficially:"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    font_style: "Title"
+
+                MDTextField:
+                    id: beneficially
+                    hint_text: "Family Name"
+                    helper_text: "Example: Njoki Family"
+                    helper_text_mode: "on_focus"
+                    icon_right: "account-group"
+                    required: True
+                    size_hint_x: 0.9
+                    pos_hint: {"center_x": 0.5}
+                MDLabel:
+		            text: "Reason For Expenditure"
+		            halign: "center"
+
+		        MDTextField:
+		            id: expense_description
+		            hint_text: "Enter family details here..."
+		            mode: "filled"              # ✅ gives filled background style
+		            multiline: True           # ✅ enables multiple lines
+		            max_text_length: 500      # optional: limit characters
+		            helper_text: "You can write up to 500 characters"
+		            helper_text_mode: "on_focus"
+		            size_hint_x: 0.95
+		            size_hint_y: None
+		            height: "150dp"           # ✅ adjust height manually
+		            pos_hint: {"center_x": 0.5}
+		        MDLabel:
+                    text: "Select Account"
+                    halign: "center"
+                    pos_hint: {"center_y": 0.95}
+
+                MDTextField:
+                    id: account_name
+                    hint_text: "Select Family"
+                    readonly: True
+                    pos_hint: {"center_x": 0.5}
+                    on_focus:
+                        if self.focus: root.open_account_menu()
+                    size_hint_x: 0.95
+                MDLabel:
+                    text: "Enter Amount:"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    font_style: "Title"
+
+                MDTextField:
+                    id: amount
+                    hint_text: "Family Name"
+                    helper_text: "Example: Njoki Family"
+                    helper_text_mode: "on_focus"
+                    icon_right: "account-group"
+                    required: True
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                MDButton:
+                    md_bg_color: app.theme_cls.primaryColor
+                    text_color: 1,1,1,1
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                    on_release:
+                        root.family_expense(beneficially.text, expense_description.text,account_name.text,amount.text)
+                    MDButtonText:
+                        text: "Add Record"
+                MDButton:
+                    md_bg_color: app.theme_cls.primaryColor
+                    text_color: 1,1,1,1
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                    on_release:
+                        root.expense_report()
+                    MDButtonText:
+                        text: "Generate Report"

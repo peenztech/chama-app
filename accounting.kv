@@ -1,0 +1,84 @@
+<AccountingScreen>:
+	name:"accounts"
+	MDBoxLayout:
+        orientation: "vertical"
+        CustomTopBar:
+            title: "Family Accounts"
+        ScrollView:
+            MDBoxLayout
+                orientation: "vertical"
+                spacing: "15dp"
+                padding: "15dp"
+                adaptive_height: True
+                MDLabel:
+                    text: "Select Family"
+                    halign: "center"
+                    pos_hint: {"center_y": 0.95}
+
+                MDTextField:
+                    id: family_name
+                    hint_text: "Select Family"
+                    readonly: True
+                    pos_hint: {"center_x": 0.5}
+                    on_focus:
+                        if self.focus: root.open_family_menu()
+                    size_hint_x: 0.95
+                MDLabel:
+                    text: "Select Family Member"
+                    halign: "center"
+                    pos_hint: {"center_y": 0.95}
+
+                MDTextField:
+                    id: family_member
+                    hint_text: "Select Family"
+                    readonly: True
+                    pos_hint: {"center_x": 0.5}
+                    on_focus:
+                        if self.focus: root.open_member_menu()
+                    size_hint_x: 0.95
+                MDLabel:
+                    text: "Select Account"
+                    halign: "center"
+                    pos_hint: {"center_y": 0.95}
+
+                MDTextField:
+                    id: account_name
+                    hint_text: "Select Family"
+                    readonly: True
+                    pos_hint: {"center_x": 0.5}
+                    on_focus:
+                        if self.focus: root.open_account_menu()
+                    size_hint_x: 0.95
+                MDLabel:
+                    text: "Enter Amount:"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    font_style: "Title"
+
+                MDTextField:
+                    id: amount
+                    hint_text: "Family Name"
+                    helper_text: "Example: Njoki Family"
+                    helper_text_mode: "on_focus"
+                    icon_right: "account-group"
+                    required: True
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                MDButton:
+                    md_bg_color: app.theme_cls.primaryColor
+                    text_color: 1,1,1,1
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                    on_release:
+                        root.family_record(family_name.text, family_member.text,account_name.text,amount.text)
+                    MDButtonText:
+                        text: "Add Record"
+                MDButton:
+                    md_bg_color: app.theme_cls.primaryColor
+                    text_color: 1,1,1,1
+                    size_hint_x: 0.95
+                    pos_hint: {"center_x": 0.5}
+                    on_release:
+                        root.generate_reports()
+                    MDButtonText:
+                        text: "Generate Report"
