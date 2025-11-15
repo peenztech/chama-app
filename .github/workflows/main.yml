@@ -15,6 +15,30 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
+    - name: Remove broken SDL2 submodule entry (CI workaround)
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -f .gitmodules ] && grep -q 'p4a_dependencies/SDL2' .gitmodules; then
+          echo "Found p4a_dependencies/SDL2 in .gitmodules — removing submodule entry for CI run."
+          # Try to deinit & remove any submodule state
+          git submodule deinit -f -- p4a_dependencies/SDL2 2>/dev/null || true
+          git rm --cached -f p4a_dependencies/SDL2 2>/dev/null || true
+          # Remove the section from .gitmodules if present
+          git config -f .gitmodules --remove-section submodule.p4a_dependencies/SDL2 2>/dev/null || true
+          # If .gitmodules is now empty, remove it from the index
+          if [ ! -s .gitmodules ]; then
+            git rm --cached -f .gitmodules 2>/dev/null || true
+          else
+            git add .gitmodules 2>/dev/null || true
+          fi
+          # Commit the change in the runner to avoid git submodule foreach later failing (this doesn't affect your remote)
+          git commit -m "CI: remove broken p4a_dependencies/SDL2 submodule" || true
+          echo "Broken submodule entry removed for this CI run."
+        else
+          echo "No SDL2 submodule entry found in .gitmodules — continuing."
+        fi
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -50,15 +74,12 @@ jobs:
         set -euo pipefail
         mkdir -p "$ANDROID_SDK_ROOT"
         cd "$ANDROID_SDK_ROOT"
-
         CMDLINE_ZIP="commandlinetools.zip"
         wget -q "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -O "$CMDLINE_ZIP"
         unzip -q "$CMDLINE_ZIP"
-
         mkdir -p cmdline-tools
         rm -rf cmdline-tools/latest
         mkdir -p cmdline-tools/latest
-
         if [ -d cmdline-tools/cmdline-tools ]; then
           for item in cmdline-tools/cmdline-tools/*; do
             [ -e "$item" ] || continue
@@ -74,14 +95,11 @@ jobs:
             mv "$item" cmdline-tools/latest/ || true
           done
         fi
-
         if [ ! -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
           echo "ERROR: sdkmanager not found at $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           ls -la "$ANDROID_SDK_ROOT/cmdline-tools/latest" || true
           exit 1
         fi
-
-        # Accept licenses (ignore broken-pipe non-zero exit)
         yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --licenses || true
 
     - name: Install platform-tools and build-tools
@@ -92,7 +110,6 @@ jobs:
           "platform-tools" \
           "platforms;android-33" \
           "build-tools;33.0.2"
-
         echo "Installed build-tools:"
         ls -la "$ANDROID_SDK_ROOT/build-tools" || true
 
@@ -116,17 +133,12 @@ jobs:
       run: |
         set -euo pipefail
         ANDROID_HOME="${ANDROID_SDK_ROOT:-$HOME/android-sdk}"
-        # Ensure Buildozer expected parents exist
         mkdir -p "$HOME/.buildozer/android/platform/android-sdk/tools/bin"
-        # Symlink the real sdkmanager into Buildozer's expected location
         if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
           ln -sfn "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
           chmod +x "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" || true
-        else
-          echo "WARN: real sdkmanager not found at $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
         fi
-        # Also make build-tools and platform-tools visible in Buildozer path
         if [ -d "$ANDROID_HOME/build-tools" ]; then
           ln -sfn "$ANDROID_HOME/build-tools" "$HOME/.buildozer/android/platform/android-sdk/build-tools"
         fi
@@ -135,7 +147,6 @@ jobs:
         fi
         echo "Contents of Buildozer SDK shim:"
         ls -la "$HOME/.buildozer/android/platform/android-sdk" || true
-        echo "sdkmanager (shim) version:"
         "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" --version || true
 
     - name: Sanity check:show aidl path
