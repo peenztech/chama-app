@@ -21,18 +21,14 @@ jobs:
         set -euo pipefail
         if [ -f .gitmodules ] && grep -q 'p4a_dependencies/SDL2' .gitmodules; then
           echo "Found p4a_dependencies/SDL2 in .gitmodules — removing submodule entry for CI run."
-          # Try to deinit & remove any submodule state
           git submodule deinit -f -- p4a_dependencies/SDL2 2>/dev/null || true
           git rm --cached -f p4a_dependencies/SDL2 2>/dev/null || true
-          # Remove the section from .gitmodules if present
           git config -f .gitmodules --remove-section submodule.p4a_dependencies/SDL2 2>/dev/null || true
-          # If .gitmodules is now empty, remove it from the index
           if [ ! -s .gitmodules ]; then
             git rm --cached -f .gitmodules 2>/dev/null || true
           else
             git add .gitmodules 2>/dev/null || true
           fi
-          # Commit the change in the runner to avoid git submodule foreach later failing (this doesn't affect your remote)
           git commit -m "CI: remove broken p4a_dependencies/SDL2 submodule" || true
           echo "Broken submodule entry removed for this CI run."
         else
@@ -100,6 +96,7 @@ jobs:
           ls -la "$ANDROID_SDK_ROOT/cmdline-tools/latest" || true
           exit 1
         fi
+        # Accept licenses (ignore broken-pipe non-zero exit)
         yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --licenses || true
 
     - name: Install platform-tools and build-tools
@@ -155,6 +152,41 @@ jobs:
         find "$ANDROID_SDK_ROOT" -type f -name aidl -print -ls || true
         find "$HOME/.buildozer/android/platform/android-sdk" -type f -name aidl -print -ls || true
 
-    - name: Build APK
+    # --- NEW: ensure buildozer.spec has log_level = 2 so the log is complete
+    - name: Ensure buildozer log_level = 2
+      shell: bash
       run: |
-        buildozer android debug --verbose
+        if [ -f buildozer.spec ]; then
+          # if there's already a [buildozer] section and a log_level line, replace it; otherwise append
+          if grep -q "^[[:space:]]*\\[buildozer\\]" buildozer.spec; then
+            if grep -q "^[[:space:]]*log_level" buildozer.spec; then
+              sed -i 's/^[[:space:]]*log_level.*/log_level = 2/' buildozer.spec || true
+            else
+              # append after [buildozer] header
+              awk '/^\[buildozer\]/{print; print "log_level = 2"; skip=1; next}1' buildozer.spec > buildozer.spec.tmp && mv buildozer.spec.tmp buildozer.spec || true
+            fi
+          else
+            # no [buildozer] section — append it
+            echo -e "\n[buildozer]\nlog_level = 2" >> buildozer.spec
+          fi
+          echo "buildozer.spec updated (showing last 20 lines):"
+          tail -n 20 buildozer.spec || true
+        else
+          echo "No buildozer.spec found in repository root; skipping."
+        fi
+
+    # --- BUILD: capture full output to buildozer.log and still let job fail if buildozer fails
+    - name: Build APK (capture log)
+      shell: bash
+      run: |
+        set -x
+        # run buildozer and capture full log (stdout+stderr) into buildozer.log
+        buildozer android debug --verbose 2>&1 | tee buildozer.log
+
+    # --- ALWAYS upload the buildozer log so we can inspect even on failure
+    - name: Upload buildozer log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: buildozer-log
+        path: buildozer.log
