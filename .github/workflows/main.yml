@@ -46,17 +46,17 @@ jobs:
         export ANDROID_SDK_ROOT=$HOME/android-sdk
         mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
         cd $ANDROID_SDK_ROOT
-
-        # Download command-line tools
+    
         wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
         unzip cmdline-tools.zip
-
-        # Move extracted cmdline-tools into 'latest'
-        mv cmdline-tools cmdline-tools/latest
-
+    
+        # Move contents into latest folder without mv self-error
+        mkdir -p cmdline-tools/latest
+        mv cmdline-tools/* cmdline-tools/latest/
+    
         # Accept licenses
         yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
-
+    
         # Install required SDK packages
         yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
             "platform-tools" \
