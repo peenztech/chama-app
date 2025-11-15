@@ -14,17 +14,28 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.12'
+        python-version: '3.12'   # IMPORTANT: Buildozer & Kivy work on 3.10
 
-    - name: Install dependencies
+    - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-dev build-essential
-        python -m ensurepip --upgrade
-        python -m pip install --upgrade pip setuptools wheel
-        # Install Buildozer, P4A, Nuitka
-        python -m pip install buildozer python-for-android nuitka
+        sudo apt-get install -y \
+          python3-dev \
+          build-essential \
+          libssl-dev \
+          libffi-dev \
+          libsqlite3-dev \
+          zip \
+          unzip \
+          default-jdk \
+          git
+
+    - name: Install Python dependencies
+      run: |
+        pip install --upgrade pip setuptools wheel
+        pip install cython
+        pip install buildozer python-for-android
 
     - name: Build APK
       run: |
-        buildozer android debug
+        buildozer android debug --verbose
