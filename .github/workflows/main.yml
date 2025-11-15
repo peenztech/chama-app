@@ -50,7 +50,7 @@ jobs:
         wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
         unzip cmdline-tools.zip
     
-        # Move contents into latest folder without mv self-error
+        # Move contents of extracted folder into latest
         mkdir -p cmdline-tools/latest
         mv cmdline-tools/* cmdline-tools/latest/
     
@@ -62,6 +62,7 @@ jobs:
             "platform-tools" \
             "platforms;android-33" \
             "build-tools;33.0.2"
+
 
     - name: Set ANDROID_HOME and PATH
       run: |
