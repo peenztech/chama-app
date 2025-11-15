@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # keep Python version as requested; if p4a fails later we can change to 3.10
+    env:
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
 
     steps:
     - name: Checkout repository
@@ -41,38 +44,38 @@ jobs:
         python -m pip install buildozer
         python -m pip install python-for-android
 
-    - name: Install Android SDK + Build-tools (robust, avoids broken pipe)
+    - name: Install Android SDK command-line tools (robust)
       shell: bash
       run: |
         set -euo pipefail
-
-        export ANDROID_SDK_ROOT="$HOME/android-sdk"
+        # use the job env variable ANDROID_SDK_ROOT (set above) which resolves to repo/android-sdk
         mkdir -p "$ANDROID_SDK_ROOT"
         cd "$ANDROID_SDK_ROOT"
 
-        # download command line tools and unpack
         CMDLINE_ZIP="commandlinetools.zip"
+        echo "Downloading cmdline tools..."
         wget -q "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -O "$CMDLINE_ZIP"
+
+        echo "Unzipping..."
         unzip -q "$CMDLINE_ZIP"
 
-        # Ensure a clean target folder
+        # prepare a clean cmdline-tools/latest and move contents (handles either zip layout)
         mkdir -p cmdline-tools
         rm -rf cmdline-tools/latest
         mkdir -p cmdline-tools/latest
 
-        # Move contents safely (handles both zip layouts)
         if [ -d cmdline-tools/cmdline-tools ]; then
-          echo "Detected nested cmdline-tools/cmdline-tools; moving its contents into cmdline-tools/latest"
+          echo "Moving nested cmdline-tools/* -> cmdline-tools/latest/"
           for item in cmdline-tools/cmdline-tools/*; do
             [ -e "$item" ] || continue
             mv "$item" cmdline-tools/latest/ || true
           done
           rm -rf cmdline-tools/cmdline-tools
         else
-          echo "Detected cmdline-tools/* layout; moving its contents into cmdline-tools/latest"
+          echo "Moving cmdline-tools/* -> cmdline-tools/latest/"
           for item in cmdline-tools/*; do
             [ -e "$item" ] || continue
-            # avoid moving the 'latest' folder itself if it exists
+            # skip the 'latest' folder if present
             if [ "$item" = "cmdline-tools/latest" ]; then
               continue
             fi
@@ -80,26 +83,71 @@ jobs:
           done
         fi
 
-        # verify sdkmanager exists
+        echo "Checking sdkmanager:"
+        ls -la cmdline-tools/latest/bin || true
+
         if [ ! -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
-          echo "ERROR: sdkmanager not found or not executable at $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          ls -la "$ANDROID_SDK_ROOT/cmdline-tools/latest" || true
+          echo "ERROR: sdkmanager not found or not executable!"
           exit 1
         fi
 
-        # Accept licenses safely (avoid failing due to broken pipe)
+        # Accept licenses (prevent broken pipe from failing the step)
+        echo "Accepting SDK licenses (may print Broken pipe which is safe)..."
         yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --licenses || true
 
-        # Install required packages (no piping yes; licenses already accepted above)
+    - name: Install build-tools + platform-tools and verify aidl exists
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Installing platform-tools + build-tools;33.0.2 ..."
         "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" \
           "platform-tools" \
           "platforms;android-33" \
-          "build-tools;33.0.2"
+          "build-tools;33.0.2" || {
+            echo "sdkmanager reported a failure while installing packages — dumping sdkmanager output..."
+            "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --verbose \
+              "platform-tools" "platforms;android-33" "build-tools;33.0.2" || true
+        }
 
-    - name: Set ANDROID_HOME and PATH
+        echo "Listing $ANDROID_SDK_ROOT contents (top-level):"
+        ls -la "$ANDROID_SDK_ROOT" || true
+
+        echo "Listing build-tools folder:"
+        ls -la "$ANDROID_SDK_ROOT/build-tools" || true
+
+        echo "Looking for 'aidl' binary:"
+        AIDL_PATH=$(find "$ANDROID_SDK_ROOT" -type f -name aidl -print -quit || true) || true
+        if [ -n "$AIDL_PATH" ]; then
+          echo "Found aidl at: $AIDL_PATH"
+          ls -la "$AIDL_PATH" || true
+        else
+          echo "aidl NOT found. Attempting to re-install build-tools;33.0.2 with verbose logging..."
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --verbose "build-tools;33.0.2" || true
+          echo "After reinstall, list build-tools:"
+          ls -la "$ANDROID_SDK_ROOT/build-tools" || true
+          echo "Search for aidl again:"
+          find "$ANDROID_SDK_ROOT" -type f -name aidl -ls || true
+        fi
+
+        # Final guard: if aidl still missing, fail with detailed diagnostics
+        AIDL_PATH2=$(find "$ANDROID_SDK_ROOT" -type f -name aidl -print -quit || true)
+        if [ -z "$AIDL_PATH2" ]; then
+          echo "ERROR: aidl not found after install attempts. Full $ANDROID_SDK_ROOT listing:"
+          ls -R "$ANDROID_SDK_ROOT" | sed -n '1,300p' || true
+          echo "If this persists: check that your buildozer.spec does NOT hardcode android.sdk_path, and that .buildozer directory (if committed) is removed from repo."
+          exit 1
+        fi
+
+    - name: Export ANDROID env for subsequent steps
       run: |
-        echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-        echo "PATH=$HOME/android-sdk/platform-tools:$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
+        echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "PATH=$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
+
+    - name: Show final aidl (sanity)
+      run: |
+        echo "AIDL resolved to:"
+        find "$ANDROID_SDK_ROOT" -type f -name aidl -print -ls || true
 
     - name: Build APK
       run: |
