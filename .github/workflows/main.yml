@@ -9,7 +9,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -33,28 +34,36 @@ jobs:
           libsqlite3-dev \
           openjdk-17-jdk
 
-    - name: Install Cython, Buildozer, P4A
+    - name: Install Cython, Buildozer, Python-for-Android
       run: |
         pip install --upgrade pip setuptools wheel
         pip install Cython
         pip install buildozer
         pip install python-for-android
 
-    - name: Install Android SDK + Build-tools (Correct Structure)
+    - name: Install Android SDK + Build-tools
       run: |
-        mkdir -p $HOME/android-sdk/cmdline-tools
-        cd $HOME/android-sdk
+        export ANDROID_SDK_ROOT=$HOME/android-sdk
+        mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+        cd $ANDROID_SDK_ROOT
 
-        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
-        unzip cmdline.zip -d cmdline-tools
-        mv cmdline-tools/cmdline-tools cmdline-tools/latest
+        # Download command-line tools
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+        unzip cmdline-tools.zip
 
-        yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/android-sdk \
+        # Move extracted cmdline-tools into 'latest'
+        mv cmdline-tools cmdline-tools/latest
+
+        # Accept licenses
+        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
+
+        # Install required SDK packages
+        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
             "platform-tools" \
             "platforms;android-33" \
             "build-tools;33.0.2"
 
-    - name: Set ANDROID_HOME + PATH
+    - name: Set ANDROID_HOME and PATH
       run: |
         echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
         echo "PATH=$HOME/android-sdk/platform-tools:$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
