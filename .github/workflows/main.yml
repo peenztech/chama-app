@@ -58,7 +58,7 @@ jobs:
           libjpeg-dev zlib1g-dev libfreetype6-dev libpng-dev \
           curl
 
-    - name: Install pip tools: Cython, buildozer, python-for-android
+    - name: Install pip tools:Cython, buildozer, python-for-android
       shell: bash
       run: |
         python -m pip install --upgrade pip setuptools wheel
