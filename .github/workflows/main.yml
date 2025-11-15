@@ -8,7 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # Keep python version as you requested; we still export SDK paths below too
+      # Keep python version as requested; SDK root inside repository workspace
       ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
 
     steps:
@@ -81,10 +81,10 @@ jobs:
           exit 1
         fi
 
-        # accept licenses (ignore broken-pipe non-zero exit)
+        # Accept licenses (ignore broken-pipe non-zero exit)
         yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --licenses || true
 
-    - name: Install platform-tools and build-tools and verify aidl
+    - name: Install platform-tools and build-tools
       shell: bash
       run: |
         set -euo pipefail
@@ -93,7 +93,7 @@ jobs:
           "platforms;android-33" \
           "build-tools;33.0.2"
 
-        echo "Listing installed build-tools:"
+        echo "Installed build-tools:"
         ls -la "$ANDROID_SDK_ROOT/build-tools" || true
 
     - name: Persist ANDROID env for later steps
@@ -106,18 +106,42 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        # Ensure Buildozer default parent exists
         mkdir -p "$HOME/.buildozer/android/platform"
-        # Force-create a symlink from Buildozer's expected path to the SDK we installed
         ln -sfn "$ANDROID_SDK_ROOT" "$HOME/.buildozer/android/platform/android-sdk"
         echo "Symlink created:"
         ls -la "$HOME/.buildozer/android/platform" || true
+
+    - name: Create compatibility shim for tools/bin/sdkmanager and build-tools/platform-tools
+      shell: bash
+      run: |
+        set -euo pipefail
+        ANDROID_HOME="${ANDROID_SDK_ROOT:-$HOME/android-sdk}"
+        # Ensure Buildozer expected parents exist
+        mkdir -p "$HOME/.buildozer/android/platform/android-sdk/tools/bin"
+        # Symlink the real sdkmanager into Buildozer's expected location
+        if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+          ln -sfn "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
+          chmod +x "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" || true
+        else
+          echo "WARN: real sdkmanager not found at $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+        fi
+        # Also make build-tools and platform-tools visible in Buildozer path
+        if [ -d "$ANDROID_HOME/build-tools" ]; then
+          ln -sfn "$ANDROID_HOME/build-tools" "$HOME/.buildozer/android/platform/android-sdk/build-tools"
+        fi
+        if [ -d "$ANDROID_HOME/platform-tools" ]; then
+          ln -sfn "$ANDROID_HOME/platform-tools" "$HOME/.buildozer/android/platform/android-sdk/platform-tools"
+        fi
+        echo "Contents of Buildozer SDK shim:"
+        ls -la "$HOME/.buildozer/android/platform/android-sdk" || true
+        echo "sdkmanager (shim) version:"
+        "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" --version || true
 
     - name: Sanity check:show aidl path
       run: |
         echo "Searching for aidl..."
         find "$ANDROID_SDK_ROOT" -type f -name aidl -print -ls || true
-        echo "Also check Buildozer path:"
         find "$HOME/.buildozer/android/platform/android-sdk" -type f -name aidl -print -ls || true
 
     - name: Build APK
