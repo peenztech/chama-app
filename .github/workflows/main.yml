@@ -11,7 +11,7 @@ jobs:
       # SDK inside repo workspace (kept simple for cache/visibility)
       ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
       # Recommended python-for-android works best with 3.10/3.11 on CI; app runtime is determined by p4a recipe
-      PYTHON_VERSION: 3.10
+      PYTHON_VERSION: 3.11
 
     steps:
     - name: Checkout repository
