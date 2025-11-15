@@ -8,7 +8,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
+      # SDK inside repo workspace (kept simple for cache/visibility)
       ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+      # Recommended python-for-android works best with 3.10/3.11 on CI; app runtime is determined by p4a recipe
+      PYTHON_VERSION: 3.10
 
     steps:
     - name: Checkout repository
@@ -17,7 +20,6 @@ jobs:
     - name: Quick cleanup of committed caches (CI-only)
       shell: bash
       run: |
-        # Remove committed .buildozer or bin folders that may contain absolute paths
         rm -rf .buildozer || true
         rm -rf bin || true
 
@@ -26,7 +28,6 @@ jobs:
       run: |
         set -euo pipefail
         if [ -f .gitmodules ] && grep -q 'p4a_dependencies/SDL2' .gitmodules; then
-          echo "Found p4a_dependencies/SDL2 in .gitmodules — removing submodule entry for CI run."
           git submodule deinit -f -- p4a_dependencies/SDL2 2>/dev/null || true
           git rm --cached -f p4a_dependencies/SDL2 2>/dev/null || true
           git config -f .gitmodules --remove-section submodule.p4a_dependencies/SDL2 2>/dev/null || true
@@ -36,39 +37,44 @@ jobs:
             git add .gitmodules 2>/dev/null || true
           fi
           git commit -m "CI: remove broken p4a_dependencies/SDL2 submodule" || true
-          echo "Broken submodule entry removed for this CI run."
-        else
-          echo "No SDL2 submodule entry found in .gitmodules — continuing."
         fi
 
     - name: Set up Python (p4a-friendly)
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'
+        python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Install Build Dependencies
+    - name: Install OS build dependencies (extra libs for native packages)
       shell: bash
       run: |
-        sudo apt update
-        sudo apt install -y \
-          python3-dev \
-          build-essential \
-          pkg-config \
-          zip \
-          unzip \
-          libncursesw6 \
-          libtinfo6 \
-          libstdc++6 \
-          libffi-dev \
-          libssl-dev \
-          libsqlite3-dev \
-          openjdk-17-jdk
+        sudo apt-get update -y
+        sudo apt-get install -y --no-install-recommends \
+          python3-dev build-essential pkg-config zip unzip \
+          libncursesw6 libtinfo6 libstdc++6 libffi-dev libssl-dev \
+          libsqlite3-dev openjdk-17-jdk \
+          libjpeg-dev zlib1g-dev libfreetype6-dev libpng-dev
 
     - name: Install Cython, Buildozer, python-for-android
       shell: bash
       run: |
         python -m pip install --upgrade pip setuptools wheel
         python -m pip install Cython buildozer python-for-android
+
+    - name: Remove problematic hardcoded paths from buildozer.spec (CI-safe)
+      shell: bash
+      run: |
+        # If your buildozer.spec has hardcoded absolute paths, they break CI.
+        # We comment out these lines so Buildozer uses defaults in CI.
+        if [ -f buildozer.spec ]; then
+          echo "Commenting out absolute-path keys (android.sdk_path, android.ndk_path, p4a.hostpython_dir, p4a.local_python) in buildozer.spec"
+          sed -i 's/^[[:space:]]*android\.sdk_path.*$/# &/' buildozer.spec || true
+          sed -i 's/^[[:space:]]*android\.ndk_path.*$/# &/' buildozer.spec || true
+          sed -i 's/^[[:space:]]*p4a\.hostpython_dir.*$/# &/' buildozer.spec || true
+          sed -i 's/^[[:space:]]*p4a\.local_python.*$/# &/' buildozer.spec || true
+          sed -n '1,200p' buildozer.spec || true
+        else
+          echo "No buildozer.spec found in repo root — build will fail without it."
+        fi
 
     - name: Install Android SDK command-line tools (robust)
       shell: bash
@@ -77,10 +83,11 @@ jobs:
         mkdir -p "$ANDROID_SDK_ROOT"
         cd "$ANDROID_SDK_ROOT"
 
+        CMDLINE_ZIP="commandlinetools.zip"
         echo "Downloading command-line tools..."
-        wget -q "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -O cmdline-tools.zip
+        wget -q "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -O "$CMDLINE_ZIP"
         echo "Unzipping..."
-        unzip -q cmdline-tools.zip
+        unzip -q "$CMDLINE_ZIP"
 
         # Prepare cmdline-tools/latest reliably (handle different zip layouts)
         mkdir -p cmdline-tools
@@ -111,19 +118,33 @@ jobs:
           exit 1
         fi
 
-        # Accept licenses (ignore broken-pipe non-zero exit)
+        # Accept licenses (ignore non-zero broken-pipe)
         yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --licenses || true
 
-    - name: Install platform-tools and build-tools
+    - name: Install platform-tools, build-tools and NDK (with retries)
       shell: bash
       run: |
         set -euo pipefail
-        "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" \
-          "platform-tools" \
-          "platforms;android-33" \
+        SDKBIN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+        # packages to install - include NDK r25c (25.2.9519653)
+        pkgs=(
+          "platform-tools"
+          "platforms;android-33"
           "build-tools;33.0.2"
-        echo "Installed build-tools:"
+          "ndk;25.2.9519653"
+        )
+        # retry loop (network/SdKserver can be flaky)
+        for i in 1 2 3; do
+          echo "sdkmanager attempt $i: installing ${pkgs[*]}"
+          "$SDKBIN" --sdk_root="$ANDROID_SDK_ROOT" "${pkgs[@]}" && break || {
+            echo "sdkmanager failed on attempt $i; retrying after sleep..."
+            sleep $(( i * 5 ))
+          }
+        done
+        echo "Installed SDK packages (listing build-tools):"
         ls -la "$ANDROID_SDK_ROOT/build-tools" || true
+        echo "NDK folders:"
+        ls -la "$ANDROID_SDK_ROOT/ndk" || true
 
     - name: Persist ANDROID env
       shell: bash
@@ -139,32 +160,30 @@ jobs:
         mkdir -p "$HOME/.buildozer/android/platform"
         ln -sfn "$ANDROID_SDK_ROOT" "$HOME/.buildozer/android/platform/android-sdk"
         mkdir -p "$HOME/.buildozer/android/platform/android-sdk/tools/bin"
-
-        # create sdkmanager shim
         if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
           ln -sfn "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
             "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
           chmod +x "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" || true
         fi
-
-        # ensure build-tools and platform-tools visible to Buildozer path
         if [ -d "$ANDROID_SDK_ROOT/build-tools" ]; then
           ln -sfn "$ANDROID_SDK_ROOT/build-tools" "$HOME/.buildozer/android/platform/android-sdk/build-tools"
         fi
         if [ -d "$ANDROID_SDK_ROOT/platform-tools" ]; then
           ln -sfn "$ANDROID_SDK_ROOT/platform-tools" "$HOME/.buildozer/android/platform/android-sdk/platform-tools"
         fi
-
-        echo "Buildozer SDK shim contents:"
+        if [ -d "$ANDROID_SDK_ROOT/ndk" ]; then
+          ln -sfn "$ANDROID_SDK_ROOT/ndk" "$HOME/.buildozer/android/platform/android-sdk/ndk"
+        fi
+        echo "Buildozer shim contents:"
         ls -la "$HOME/.buildozer/android/platform/android-sdk" || true
-        "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" --version || true
 
-    - name: Sanity check - ensure aidl exists
+    - name: Sanity check - ensure aidl / ndk exist
       shell: bash
       run: |
-        echo "Searching for aidl..."
-        find "$ANDROID_SDK_ROOT" -type f -name aidl -print -ls || true
-        find "$HOME/.buildozer/android/platform/android-sdk" -type f -name aidl -print -ls || true
+        echo "Searching for aidl and ndk directories:"
+        find "$ANDROID_SDK_ROOT" -maxdepth 4 -type f -name aidl -print -ls || true
+        ls -la "$ANDROID_SDK_ROOT/ndk" || true
+        ls -la "$HOME/.buildozer/android/platform/android-sdk/ndk" || true
 
     - name: Ensure buildozer.spec log_level = 2
       shell: bash
@@ -179,10 +198,6 @@ jobs:
           else
             echo -e "\n[buildozer]\nlog_level = 2" >> buildozer.spec
           fi
-          echo "Updated buildozer.spec (last 20 lines):"
-          tail -n 20 buildozer.spec || true
-        else
-          echo "buildozer.spec not found; continuing (buildozer will fail if missing)."
         fi
 
     - name: Debug versions (diagnostics)
@@ -201,16 +216,14 @@ jobs:
       shell: bash
       run: |
         set -x
-        # build and capture full log
+        # run buildozer and capture full log (stdout+stderr) into buildozer.log
         buildozer android debug --verbose 2>&1 | tee buildozer.log
 
     - name: Collect APKs (if any)
       shell: bash
       run: |
         mkdir -p apk-artifacts
-        # Search common Buildozer output locations for APKs and copy
         find . -type f -name "*.apk" -exec cp --parents {} apk-artifacts/ \; || true
-        # Also try bin/
         cp -v bin/*.apk apk-artifacts/ 2>/dev/null || true
         ls -la apk-artifacts || true
 
