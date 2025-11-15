@@ -33,34 +33,33 @@ jobs:
           libsqlite3-dev \
           openjdk-17-jdk
 
-
     - name: Install Cython, Buildozer, P4A
       run: |
         pip install --upgrade pip setuptools wheel
         pip install cython
         pip install buildozer python-for-android
 
-    - name: Install Android SDK + Build-tools manually
+    - name: Install Android SDK + Build-tools
       run: |
         mkdir -p $HOME/android-sdk
         cd $HOME/android-sdk
 
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
         unzip commandlinetools-linux-9477386_latest.zip
-        mkdir cmdline-tools
-        mv cmdline-tools cmdline-tools/latest
+
+        # Create proper structure
+        mkdir -p cmdline-tools/latest
+        mv cmdline-tools/* cmdline-tools/latest/
 
         yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/android-sdk \
-          "platform-tools" \
-          "platforms;android-33" \
-          "build-tools;33.0.2" \
-          "emulator" \
-          "platforms;android-30"
+            "platform-tools" \
+            "platforms;android-33" \
+            "build-tools;33.0.2"
 
     - name: Set ANDROID_HOME
       run: |
         echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-        echo "PATH=$HOME/android-sdk/platform-tools:$HOME/android-sdk/emulator:$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
+        echo "PATH=$HOME/android-sdk/platform-tools:$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
 
     - name: Build APK
       run: |
