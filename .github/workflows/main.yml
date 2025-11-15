@@ -36,33 +36,68 @@ jobs:
 
     - name: Install Cython, Buildozer, Python-for-Android
       run: |
-        pip install --upgrade pip setuptools wheel
-        pip install Cython
-        pip install buildozer
-        pip install python-for-android
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install Cython
+        python -m pip install buildozer
+        python -m pip install python-for-android
 
-    - name: Install Android SDK + Build-tools
+    - name: Install Android SDK + Build-tools (robust, no mv errors)
+      shell: bash
       run: |
-        export ANDROID_SDK_ROOT=$HOME/android-sdk
-        mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
-        cd $ANDROID_SDK_ROOT
-    
-        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-        unzip cmdline-tools.zip
-    
-        # Move contents of extracted folder into latest
-        mkdir -p cmdline-tools/latest
-        mv cmdline-tools/* cmdline-tools/latest/
-    
-        # Accept licenses
-        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
-    
-        # Install required SDK packages
-        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
-            "platform-tools" \
-            "platforms;android-33" \
-            "build-tools;33.0.2"
+        set -euo pipefail
 
+        export ANDROID_SDK_ROOT="$HOME/android-sdk"
+        mkdir -p "$ANDROID_SDK_ROOT"
+        cd "$ANDROID_SDK_ROOT"
+
+        # download command line tools and unpack
+        CMDLINE_ZIP="commandlinetools.zip"
+        wget -q "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -O "$CMDLINE_ZIP"
+        unzip -q "$CMDLINE_ZIP"
+
+        # Ensure a clean target folder
+        mkdir -p cmdline-tools
+        rm -rf cmdline-tools/latest
+        mkdir -p cmdline-tools/latest
+
+        # The zip may extract a 'cmdline-tools' folder which itself contains files,
+        # or may extract files directly. Move contents correctly without moving a folder into itself.
+        if [ -d cmdline-tools/cmdline-tools ]; then
+          # common case: zip created cmdline-tools/cmdline-tools/{bin,lib,...}
+          echo "Detected nested cmdline-tools/cmdline-tools; moving its contents into cmdline-tools/latest"
+          for item in cmdline-tools/cmdline-tools/*; do
+            # skip if nothing matches
+            [ -e "$item" ] || continue
+            mv "$item" cmdline-tools/latest/ || true
+          done
+          # remove the now-empty nested folder
+          rm -rf cmdline-tools/cmdline-tools
+        else
+          # zip extracted files directly into cmdline-tools/
+          echo "Detected cmdline-tools/* layout; moving its contents into cmdline-tools/latest"
+          for item in cmdline-tools/*; do
+            # avoid moving the 'latest' folder itself if it somehow exists
+            [ -e "$item" ] || continue
+            if [ "$item" = "cmdline-tools/latest" ]; then
+              continue
+            fi
+            mv "$item" cmdline-tools/latest/ || true
+          done
+        fi
+
+        # make sure sdkmanager exists
+        if [ ! -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+          echo "ERROR: sdkmanager not found or not executable at $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          ls -la "$ANDROID_SDK_ROOT/cmdline-tools/latest" || true
+          exit 1
+        fi
+
+        # Accept licenses (non-interactive) and install packages
+        yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --licenses
+        yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" \
+          "platform-tools" \
+          "platforms;android-33" \
+          "build-tools;33.0.2"
 
     - name: Set ANDROID_HOME and PATH
       run: |
@@ -71,4 +106,4 @@ jobs:
 
     - name: Build APK
       run: |
-        buildozer android debug
+        buildozer android debug --verbose
