@@ -36,27 +36,25 @@ jobs:
     - name: Install Cython, Buildozer, P4A
       run: |
         pip install --upgrade pip setuptools wheel
-        pip install cython
-        pip install buildozer python-for-android
+        pip install Cython
+        pip install buildozer
+        pip install python-for-android
 
-    - name: Install Android SDK + Build-tools
+    - name: Install Android SDK + Build-tools (Correct Structure)
       run: |
-        mkdir -p $HOME/android-sdk
+        mkdir -p $HOME/android-sdk/cmdline-tools
         cd $HOME/android-sdk
 
-        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-        unzip commandlinetools-linux-9477386_latest.zip
-
-        # Create proper structure
-        mkdir -p cmdline-tools/latest
-        mv cmdline-tools/* cmdline-tools/latest/
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
+        unzip cmdline.zip -d cmdline-tools
+        mv cmdline-tools/cmdline-tools cmdline-tools/latest
 
         yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/android-sdk \
             "platform-tools" \
             "platforms;android-33" \
             "build-tools;33.0.2"
 
-    - name: Set ANDROID_HOME
+    - name: Set ANDROID_HOME + PATH
       run: |
         echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
         echo "PATH=$HOME/android-sdk/platform-tools:$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
