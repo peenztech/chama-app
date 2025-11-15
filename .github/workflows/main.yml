@@ -14,28 +14,52 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.12'   # IMPORTANT: Buildozer & Kivy work on 3.10
+        python-version: '3.12'
 
-    - name: Install system dependencies
+    - name: Install Build Dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y \
+        sudo apt update
+        sudo apt install -y \
           python3-dev \
           build-essential \
-          libssl-dev \
-          libffi-dev \
-          libsqlite3-dev \
+          pkg-config \
           zip \
           unzip \
-          default-jdk \
-          git
+          libncurses5 \
+          libstdc++6 \
+          libffi-dev \
+          libssl-dev \
+          libsqlite3-dev \
+          openjdk-17-jdk
 
-    - name: Install Python dependencies
+    - name: Install Cython, Buildozer, P4A
       run: |
         pip install --upgrade pip setuptools wheel
         pip install cython
         pip install buildozer python-for-android
 
+    - name: Install Android SDK + Build-tools manually
+      run: |
+        mkdir -p $HOME/android-sdk
+        cd $HOME/android-sdk
+
+        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+        unzip commandlinetools-linux-9477386_latest.zip
+        mkdir cmdline-tools
+        mv cmdline-tools cmdline-tools/latest
+
+        yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/android-sdk \
+          "platform-tools" \
+          "platforms;android-33" \
+          "build-tools;33.0.2" \
+          "emulator" \
+          "platforms;android-30"
+
+    - name: Set ANDROID_HOME
+      run: |
+        echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "PATH=$HOME/android-sdk/platform-tools:$HOME/android-sdk/emulator:$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
+
     - name: Build APK
       run: |
-        buildozer android debug --verbose
+        buildozer android debug
