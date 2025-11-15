@@ -25,12 +25,14 @@ jobs:
           pkg-config \
           zip \
           unzip \
-          libncurses5 \
+          libncursesw6 \
+          libtinfo6 \
           libstdc++6 \
           libffi-dev \
           libssl-dev \
           libsqlite3-dev \
           openjdk-17-jdk
+
 
     - name: Install Cython, Buildozer, P4A
       run: |
