@@ -41,7 +41,7 @@ jobs:
         python -m pip install buildozer
         python -m pip install python-for-android
 
-    - name: Install Android SDK + Build-tools (robust, no mv errors)
+    - name: Install Android SDK + Build-tools (robust, avoids broken pipe)
       shell: bash
       run: |
         set -euo pipefail
@@ -60,24 +60,19 @@ jobs:
         rm -rf cmdline-tools/latest
         mkdir -p cmdline-tools/latest
 
-        # The zip may extract a 'cmdline-tools' folder which itself contains files,
-        # or may extract files directly. Move contents correctly without moving a folder into itself.
+        # Move contents safely (handles both zip layouts)
         if [ -d cmdline-tools/cmdline-tools ]; then
-          # common case: zip created cmdline-tools/cmdline-tools/{bin,lib,...}
           echo "Detected nested cmdline-tools/cmdline-tools; moving its contents into cmdline-tools/latest"
           for item in cmdline-tools/cmdline-tools/*; do
-            # skip if nothing matches
             [ -e "$item" ] || continue
             mv "$item" cmdline-tools/latest/ || true
           done
-          # remove the now-empty nested folder
           rm -rf cmdline-tools/cmdline-tools
         else
-          # zip extracted files directly into cmdline-tools/
           echo "Detected cmdline-tools/* layout; moving its contents into cmdline-tools/latest"
           for item in cmdline-tools/*; do
-            # avoid moving the 'latest' folder itself if it somehow exists
             [ -e "$item" ] || continue
+            # avoid moving the 'latest' folder itself if it exists
             if [ "$item" = "cmdline-tools/latest" ]; then
               continue
             fi
@@ -85,16 +80,18 @@ jobs:
           done
         fi
 
-        # make sure sdkmanager exists
+        # verify sdkmanager exists
         if [ ! -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
           echo "ERROR: sdkmanager not found or not executable at $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           ls -la "$ANDROID_SDK_ROOT/cmdline-tools/latest" || true
           exit 1
         fi
 
-        # Accept licenses (non-interactive) and install packages
-        yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --licenses
-        yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" \
+        # Accept licenses safely (avoid failing due to broken pipe)
+        yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --licenses || true
+
+        # Install required packages (no piping yes; licenses already accepted above)
+        "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" \
           "platform-tools" \
           "platforms;android-33" \
           "build-tools;33.0.2"
